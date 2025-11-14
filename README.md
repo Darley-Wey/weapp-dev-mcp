@@ -8,6 +8,39 @@
 - 本地已安装 Node.js 18+ 和 `npm`
 - 有可以在开发者工具中打开的小程序项目
 
+## 快速开始（npm 包）
+
+`@yfme/weapp-dev-mcp` 已发布到 npm，普通使用者无需克隆仓库或手动执行 `node dist/index.js`。下面的命令会直接从 npm 下载可执行版本。
+
+### 使用 npx 临时运行（推荐）
+
+```bash
+npx -y \
+  -p @modelcontextprotocol/sdk@1.17.2 \
+  -p fastmcp@3.23.0 \
+  -p @yfme/weapp-dev-mcp \
+  weapp-dev-mcp
+```
+
+- `-y` 自动确认依赖安装。
+- 通过 `-p` 显式钉住 `@modelcontextprotocol/sdk@1.17.2` 与 `fastmcp@3.23.0`，可规避新版 SDK 在启动阶段抛出的 “Server does not support completions” 错误。
+- `weapp-dev-mcp` 是包中导出的 CLI 名称。
+
+### 安装到项目/全局
+
+```bash
+npm install --save-dev \
+  @modelcontextprotocol/sdk@1.17.2 \
+  fastmcp@3.23.0 \
+  @yfme/weapp-dev-mcp
+
+npx weapp-dev-mcp
+```
+
+或使用 `npm install -g ... && weapp-dev-mcp`。同样需要锁定 SDK 和 fastmcp 的版本。
+
+> 只有在本仓库内开发时，才建议直接运行 `node dist/index.js`。一般用户请按照以上 npm 包方式启动。
+
 ## MCP 客户端集成
 
 ### 配置
@@ -20,7 +53,13 @@
 >   "mcpServers": {
 >     "weapp-dev": {
 >       "command": "npx",
->       "args": ["@yfme/weapp-dev-mcp"],
+>       "args": [
+>         "-y",
+>         "-p", "@modelcontextprotocol/sdk@1.17.2",
+>         "-p", "fastmcp@3.23.0",
+>         "-p", "@yfme/weapp-dev-mcp",
+>         "weapp-dev-mcp"
+>       ],
 >       "env": {
 >         "WEAPP_WS_ENDPOINT": "ws://localhost:9420"
 >       }
@@ -82,6 +121,11 @@
 > **注意：** 当启动开发者工具（`launch` 模式）时，必须通过 MCP 工具参数提供小程序项目目录：在执行操作前通过 `connection.projectPath` 提供（例如通过 `mp_ensureConnection`）。该值一旦建立，将在后续调用中持久化。
 
 工具调用可以通过 `connection` 对象覆盖这些默认值中的大部分。
+
+### 常见错误
+
+- **`Server does not support completions (required for completion/complete)`**  
+  新版 `@modelcontextprotocol/sdk` 在启动阶段强制要求 completions 能力，而当前版本的 `weapp-dev-mcp` 尚未实现相关接口。按照“快速开始”章节的命令显式安装 `@modelcontextprotocol/sdk@1.17.2` 与 `fastmcp@3.23.0` 可立即规避；未来版本将内置兼容逻辑。
 
 ## 可用工具
 
