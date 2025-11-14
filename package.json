@@ -33,7 +33,7 @@
     "README.md"
   ],
   "dependencies": {
-    "fastmcp": "^3.22.0",
+    "fastmcp": "^3.23.0",
     "miniprogram-automator": "^0.12.1",
     "zod": "^3.22.4"
   },
