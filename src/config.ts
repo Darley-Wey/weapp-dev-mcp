@@ -136,3 +136,5 @@ export function resolveConfig(
 
   return config;
 }
+
+export const globalTimeoutMs = 15000;

@@ -103,6 +103,7 @@ function createEnsureConnectionTool(manager: WeappAutomatorManager): AnyTool {
 
       return result;
     },
+    timeoutMs: 30000,
   };
 }
 
