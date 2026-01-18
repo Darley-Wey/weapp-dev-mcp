@@ -21,7 +21,8 @@ export const connectionOnlyParameters = connectionContainerSchema;
 export const ensureConnectionParameters = connectionContainerSchema
   .extend({
     reconnect: z.coerce.boolean().optional().default(false),
-  });
+  })
+  .default({});
 
 export const querySchema = z.record(z.string()).optional();
 

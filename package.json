@@ -9,6 +9,8 @@
   "scripts": {
     "build": "tsc --project tsconfig.json",
     "dev": "node --import tsx src/index.ts",
+    "test:ensure-connection": "node --import tsx scripts/validate-ensure-connection.mjs",
+    "test:http-ensure-connection": "node --import tsx scripts/validate-http-ensure-connection.mjs",
     "start": "node dist/index.js",
     "prepublishOnly": "npm run build"
   },
