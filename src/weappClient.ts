@@ -51,8 +51,6 @@ export class WeappAutomatorManager {
   ): Promise<T> {
     const { overrides, reconnect } = options;
     let config: WeappConnectionConfig;
-    // 添加 await Promise.resolve() 确保异常在正确的异步上下文中抛出
-    await Promise.resolve();
     try {
       config = resolveConfig(overrides, this.config);
     } catch (error) {
