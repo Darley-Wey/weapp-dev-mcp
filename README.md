@@ -139,7 +139,8 @@ npx weapp-dev-mcp
 
 ### 页面工具（Page Tools）
 
-- `page_getElement` – 通过选择器获取页面元素
+- `page_getElement` – 通过选择器获取页面元素，返回元素摘要信息（tagName、text、value、size、offset）；设置 `withWxml: true` 可额外返回完整 outerWxml
+- `page_getElements` – 通过选择器获取页面元素数组，返回每个元素的摘要信息；设置 `withWxml: true` 可额外返回每个元素的完整 outerWxml
 - `page_waitElement` – 等待元素出现在页面上（⚠️ 不适用于自定义组件内部元素）
 - `page_waitTimeout` – 等待指定的毫秒数
 - `page_getData` – 获取当前页面的数据对象，可指定路径
@@ -153,9 +154,8 @@ npx weapp-dev-mcp
 - `element_callMethod` – 调用自定义组件实例的方法（需要 ID 选择器）
 - `element_getData` – 获取自定义组件实例的渲染数据（需要 ID 选择器）
 - `element_setData` – 设置自定义组件实例的渲染数据（需要 ID 选择器）
-- `element_getInnerElement` – 获取元素内的元素（相当于 `element.$(selector)`）
-- `element_getInnerElements` – 获取元素内的元素数组（相当于 `element.$$(selector)`）
-- `element_getSize` – 获取元素大小（宽度和高度）
+- `element_getInnerElement` – 获取元素内的元素（相当于 `element.$(selector)`），返回元素摘要信息；设置 `withWxml: true` 可额外返回完整 outerWxml
+- `element_getInnerElements` – 获取元素内的元素数组（相当于 `element.$$(selector)`），返回元素摘要信息；设置 `withWxml: true` 可额外返回每个元素的完整 outerWxml
 - `element_getWxml` – 获取元素 WXML（内部或外部）
 
 每个工具都接受可选的 `connection` 块来覆盖环境默认值（项目路径、CLI 路径、WebSocket 端点等）。
@@ -179,7 +179,7 @@ npx weapp-dev-mcp
 
 #### 方法一：使用 `innerSelector` 参数（推荐）
 
-适用于 `element_tap`、`element_input`、`element_getSize`、`element_getWxml` 等工具：
+适用于 `element_tap`、`element_input`、`element_getWxml` 等工具：
 
 ```json
 {

@@ -37,11 +37,18 @@ const waitForTimeoutParameters = connectionContainerSchema.extend({
 const getElementParameters = connectionContainerSchema.extend({
   selector: z.string().trim().min(1),
   innerSelector: z.string().trim().min(1).optional(),
+  withWxml: z.boolean().optional().default(false),
+});;
+
+const getElementsParameters = connectionContainerSchema.extend({
+  selector: z.string().trim().min(1),
+  withWxml: z.boolean().optional().default(false),
 });
 
 export function createPageTools(manager: WeappAutomatorManager): AnyTool[] {
   return [
     createGetElementTool(manager),
+    createGetElementsTool(manager),
     createWaitForElementTool(manager),
     createWaitForTimeoutTool(manager),
     createGetPageDataTool(manager),
@@ -53,7 +60,7 @@ export function createPageTools(manager: WeappAutomatorManager): AnyTool[] {
 function createGetElementTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "page_getElement",
-    description: "通过选择器获取页面元素。",
+    description: "通过选择器获取页面元素。设置 withWxml 为 true 可额外返回元素的完整 outerWxml。",
     parameters: getElementParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getElementParameters.parse(rawArgs ?? {});
@@ -66,8 +73,51 @@ function createGetElementTool(manager: WeappAutomatorManager): AnyTool {
             args.selector,
             args.innerSelector
           );
-          const summary = await summarizeElement(element);
+          const summary = await summarizeElement(element, { withWxml: args.withWxml });
           return toTextResult(formatJson(summary));
+        }
+      );
+    },
+  };
+}
+
+function createGetElementsTool(manager: WeappAutomatorManager): AnyTool {
+  return {
+    name: "page_getElements",
+    description: "通过选择器获取页面元素数组，相当于 page.$$(selector)。返回每个元素的摘要信息（tagName、text、value、size、offset）；设置 withWxml 为 true 可额外返回每个元素的完整 outerWxml。",
+    parameters: getElementsParameters,
+    execute: async (rawArgs, context: ToolContext) => {
+      const args = getElementsParameters.parse(rawArgs ?? {});
+      return manager.withPage<ContentResult>(
+        context.log,
+        { overrides: args.connection },
+        async (page) => {
+          if (typeof page.$$ !== "function") {
+            throw new UserError("当前页面不支持查询元素数组。");
+          }
+
+          const elements = await page.$$(args.selector);
+          if (!Array.isArray(elements)) {
+            throw new UserError(`查询选择器 "${args.selector}" 失败。`);
+          }
+
+          const elementsInfo = await Promise.all(
+            elements.map(async (el, index) => {
+              const summary = await summarizeElement(el, { withWxml: args.withWxml });
+              return {
+                index,
+                ...summary,
+              };
+            })
+          );
+
+          return toTextResult(
+            formatJson({
+              selector: args.selector,
+              count: elements.length,
+              elements: elementsInfo,
+            })
+          );
         }
       );
     },

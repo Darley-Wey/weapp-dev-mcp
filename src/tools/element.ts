@@ -8,6 +8,7 @@ import {
   connectionContainerSchema,
   formatJson,
   resolveElement,
+  summarizeElement,
   toSerializableValue,
   toTextResult,
   waitOnPage,
@@ -48,17 +49,14 @@ const getInnerElementParameters = connectionContainerSchema.extend({
   selector: z.string().trim().min(1),
   innerSelector: z.string().trim().min(1).optional(),
   targetSelector: z.string().trim().min(1),
+  withWxml: z.boolean().optional().default(false),
 });
 
 const getInnerElementsParameters = connectionContainerSchema.extend({
   selector: z.string().trim().min(1),
   innerSelector: z.string().trim().min(1).optional(),
   targetSelector: z.string().trim().min(1),
-});
-
-const getElementSizeParameters = connectionContainerSchema.extend({
-  selector: z.string().trim().min(1),
-  innerSelector: z.string().trim().min(1).optional(),
+  withWxml: z.boolean().optional().default(false),
 });
 
 const getElementWxmlParameters = connectionContainerSchema.extend({
@@ -78,7 +76,6 @@ export function createElementTools(
     createSetElementDataTool(manager),
     createGetInnerElementTool(manager),
     createGetInnerElementsTool(manager),
-    createGetElementSizeTool(manager),
     createGetElementWxmlTool(manager),
   ];
 }
@@ -237,7 +234,7 @@ function createSetElementDataTool(manager: WeappAutomatorManager): AnyTool {
 function createGetInnerElementTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getInnerElement",
-    description: "在元素范围内获取元素，相当于 element.$(selector)。重要：操作自定义组件内部元素时，必须先通过 ID 选择器(如 #my-component)定位自定义组件，然后使用此工具获取组件内部的元素。",
+    description: "在元素范围内获取元素，相当于 element.$(selector)。重要：操作自定义组件内部元素时，必须先通过 ID 选择器(如 #my-component)定位自定义组件，然后使用此工具获取组件内部的元素。设置 withWxml 为 true 可额外返回元素的完整 outerWxml。",
     parameters: getInnerElementParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getInnerElementParameters.parse(rawArgs ?? {});
@@ -264,22 +261,14 @@ function createGetInnerElementTool(manager: WeappAutomatorManager): AnyTool {
             );
           }
 
-          const tagName = innerElement.tagName || null;
-          const text = typeof innerElement.text === "function"
-            ? await innerElement.text().catch(() => null)
-            : null;
-          const outerWxml = typeof innerElement.outerWxml === "function"
-            ? await innerElement.outerWxml().catch(() => null)
-            : null;
+          const summary = await summarizeElement(innerElement, { withWxml: args.withWxml });
 
           return toTextResult(
             formatJson({
               parentSelector: args.selector,
               parentInnerSelector: args.innerSelector ?? null,
               targetSelector: args.targetSelector,
-              tagName: toSerializableValue(tagName),
-              text: toSerializableValue(text),
-              outerWxml: toSerializableValue(outerWxml),
+              ...summary,
             })
           );
         }
@@ -291,7 +280,7 @@ function createGetInnerElementTool(manager: WeappAutomatorManager): AnyTool {
 function createGetInnerElementsTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getInnerElements",
-    description: "在元素范围内获取元素数组，相当于 element.$$(selector)。重要：操作自定义组件内部元素时，必须先通过 ID 选择器(如 #my-component)定位自定义组件，然后使用此工具获取组件内部的元素数组。",
+    description: "在元素范围内获取元素数组，相当于 element.$$(selector)。重要：操作自定义组件内部元素时，必须先通过 ID 选择器(如 #my-component)定位自定义组件，然后使用此工具获取组件内部的元素数组。设置 withWxml 为 true 可额外返回每个元素的完整 outerWxml。",
     parameters: getInnerElementsParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getInnerElementsParameters.parse(rawArgs ?? {});
@@ -320,14 +309,10 @@ function createGetInnerElementsTool(manager: WeappAutomatorManager): AnyTool {
 
           const elementsInfo = await Promise.all(
             innerElements.map(async (el, index) => {
-              const tagName = el.tagName || null;
-              const text = typeof el.text === "function"
-                ? await el.text().catch(() => null)
-                : null;
+              const summary = await summarizeElement(el, { withWxml: args.withWxml });
               return {
                 index,
-                tagName: toSerializableValue(tagName),
-                text: toSerializableValue(text),
+                ...summary,
               };
             })
           );
@@ -339,44 +324,6 @@ function createGetInnerElementsTool(manager: WeappAutomatorManager): AnyTool {
               targetSelector: args.targetSelector,
               count: innerElements.length,
               elements: elementsInfo,
-            })
-          );
-        }
-      );
-    },
-  };
-}
-
-function createGetElementSizeTool(manager: WeappAutomatorManager): AnyTool {
-  return {
-    name: "element_getSize",
-    description: "获取元素大小(宽度和高度)。如需获取自定义组件内部元素的大小，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器。",
-    parameters: getElementSizeParameters,
-    execute: async (rawArgs, context: ToolContext) => {
-      const args = getElementSizeParameters.parse(rawArgs ?? {});
-      return manager.withPage(
-        context.log,
-        { overrides: args.connection },
-        async (page) => {
-          const element = await resolveElement(
-            page,
-            args.selector,
-            args.innerSelector
-          );
-
-          if (typeof element.size !== "function") {
-            throw new UserError(
-              `元素 "${args.selector}" 不支持获取大小。`
-            );
-          }
-
-          const size = await element.size();
-          return toTextResult(
-            formatJson({
-              selector: args.selector,
-              innerSelector: args.innerSelector ?? null,
-              width: toSerializableValue(size.width),
-              height: toSerializableValue(size.height),
             })
           );
         }

@@ -116,27 +116,58 @@ export async function resolveElement(
 }
 
 export async function summarizeElement(
-  element: any
+  element: any,
+  options?: { withWxml?: boolean }
 ): Promise<Record<string, SerializableValue>> {
   const tagName = typeof element?.tagName === "string" ? element.tagName : null;
-  const [text, value, outerWxml] = await Promise.all([
+  const withWxml = options?.withWxml ?? false;
+  
+  const [text, value, outerWxml, size, offset, scrollWidth, scrollHeight] = await Promise.all([
     typeof element?.text === "function"
       ? element.text().catch(() => null)
       : null,
     typeof element?.value === "function"
       ? element.value().catch(() => null)
       : null,
-    typeof element?.outerWxml === "function"
+    withWxml && typeof element?.outerWxml === "function"
       ? element.outerWxml().catch(() => null)
+      : null,
+    typeof element?.size === "function"
+      ? element.size().catch(() => null)
+      : null,
+    typeof element?.offset === "function"
+      ? element.offset().catch(() => null)
+      : null,
+    typeof element?.scrollWidth === "function"
+      ? element.scrollWidth().catch(() => null)
+      : null,
+    typeof element?.scrollHeight === "function"
+      ? element.scrollHeight().catch(() => null)
       : null,
   ]);
 
-  return {
+  const result: Record<string, SerializableValue> = {
     tagName: toSerializableValue(tagName),
     text: toSerializableValue(text),
     value: toSerializableValue(value),
-    outerWxml: toSerializableValue(outerWxml),
+    size: toSerializableValue(size),
+    offset: toSerializableValue(offset),
   };
+
+  // 当 withWxml 为 true 时，返回完整的 outerWxml
+  if (withWxml && outerWxml !== null) {
+    result.outerWxml = toSerializableValue(outerWxml);
+  }
+
+  // scroll-view 专用属性，仅在有值时添加
+  if (scrollWidth !== null) {
+    result.scrollWidth = toSerializableValue(scrollWidth);
+  }
+  if (scrollHeight !== null) {
+    result.scrollHeight = toSerializableValue(scrollHeight);
+  }
+
+  return result;
 }
 
 export async function waitOnPage(page: unknown, waitMs?: number): Promise<void> {
