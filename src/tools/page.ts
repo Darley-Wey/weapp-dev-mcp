@@ -165,7 +165,7 @@ function createWaitForTimeoutTool(manager: WeappAutomatorManager): AnyTool {
 function createGetPageDataTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "page_getData",
-    description: "获取当前页面的数据对象，可选择指定路径。",
+    description: "获取当前页面的数据对象，可选择指定子数据路径。",
     parameters: getPageDataParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getPageDataParameters.parse(rawArgs ?? {});
