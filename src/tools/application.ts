@@ -210,7 +210,7 @@ function createScreenshotTool(manager: WeappAutomatorManager): AnyTool {
 function createCallWxMethodTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "mp_callWx",
-    description: "调用微信小程序 API 方法。",
+    description: "调用微信小程序 API 方法，（如 `wx.pageScrollTo`）。",
     parameters: callWxMethodParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = callWxMethodParameters.parse(rawArgs ?? {});
