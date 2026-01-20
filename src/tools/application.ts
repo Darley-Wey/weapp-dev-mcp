@@ -50,6 +50,10 @@ const getConsoleLogsParameters = connectionContainerSchema.extend({
   clear: z.coerce.boolean().optional().default(false),
 });
 
+const currentPageParameters = connectionContainerSchema.extend({
+  withData: z.coerce.boolean().optional().default(false),
+});
+
 export function createApplicationTools(
   manager: WeappAutomatorManager
 ): AnyTool[] {
@@ -59,6 +63,7 @@ export function createApplicationTools(
     createScreenshotTool(manager),
     createCallWxMethodTool(manager),
     createGetConsoleLogsTool(manager),
+    createCurrentPageTool(manager),
   ];
 }
 
@@ -259,6 +264,47 @@ function createGetConsoleLogsTool(manager: WeappAutomatorManager): AnyTool {
             data: log.data,
           })),
         })
+      );
+    },
+  };
+}
+
+function createCurrentPageTool(manager: WeappAutomatorManager): AnyTool {
+  return {
+    name: "mp_currentPage",
+    description:
+      "获取当前页面的信息，包括路径、查询参数、尺寸和滚动位置。withData 为 true 时额外返回页面数据。",
+    parameters: currentPageParameters,
+    execute: async (rawArgs, context: ToolContext) => {
+      const args = currentPageParameters.parse(rawArgs ?? {});
+      return manager.withMiniProgram<ContentResult>(
+        context.log,
+        { overrides: args.connection },
+        async (miniProgram) => {
+          const page = await miniProgram.currentPage();
+          if (!page) {
+            return toTextResult(formatJson({ error: "当前没有活动页面" }));
+          }
+
+          const [size, scrollTop] = await Promise.all([
+            page.size().catch(() => null),
+            page.scrollTop().catch(() => null),
+          ]);
+
+          const result: Record<string, unknown> = {
+            path: page.path,
+            query: toSerializableValue(page.query),
+            size: toSerializableValue(size),
+            scrollTop: toSerializableValue(scrollTop),
+          };
+
+          if (args.withData) {
+            const data = await page.data().catch(() => null);
+            result.data = toSerializableValue(data);
+          }
+
+          return toTextResult(formatJson(result));
+        }
       );
     },
   };

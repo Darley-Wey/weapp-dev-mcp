@@ -136,6 +136,7 @@ npx weapp-dev-mcp
 - `mp_screenshot` – 捕获屏幕截图并返回（或保存到磁盘）
 - `mp_callWx` – 调用微信小程序 API 方法（如 `wx.showToast`）
 - `mp_getLogs` – 获取小程序控制台日志，可选择获取后清除
+- `mp_currentPage` – 获取当前页面信息（路径、查询参数、尺寸、滚动位置），`withData` 为 true 时额外返回页面数据
 
 ### 页面工具（Page Tools）
 
