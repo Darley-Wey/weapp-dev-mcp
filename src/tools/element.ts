@@ -69,7 +69,20 @@ const getElementStylesParameters = connectionContainerSchema.extend({
   selector: z.string().trim().min(1),
   innerSelector: z.string().trim().min(1).optional(),
   names: z.array(z.string().trim().min(1)),
-});;
+});
+
+const scrollToParameters = connectionContainerSchema.extend({
+  selector: z.string().trim().min(1),
+  innerSelector: z.string().trim().min(1).optional(),
+  x: z.coerce.number(),
+  y: z.coerce.number(),
+});
+
+const getAttributesParameters = connectionContainerSchema.extend({
+  selector: z.string().trim().min(1),
+  innerSelector: z.string().trim().min(1).optional(),
+  names: z.array(z.string().trim().min(1)),
+});
 
 export function createElementTools(
   manager: WeappAutomatorManager
@@ -84,6 +97,8 @@ export function createElementTools(
     createGetInnerElementsTool(manager),
     createGetElementWxmlTool(manager),
     createGetElementStylesTool(manager),
+    createScrollToTool(manager),
+    createGetAttributesTool(manager),
   ];
 }
 
@@ -418,6 +433,88 @@ function createGetElementStylesTool(manager: WeappAutomatorManager): AnyTool {
               selector: args.selector,
               innerSelector: args.innerSelector ?? null,
               styles,
+            })
+          );
+        }
+      );
+    },
+  };
+}
+
+function createScrollToTool(manager: WeappAutomatorManager): AnyTool {
+  return {
+    name: "element_scrollTo",
+    description: "滚动 scroll-view 组件到指定位置。仅适用于 scroll-view 组件。如需滚动自定义组件内部的 scroll-view，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部 scroll-view 的选择器。",
+    parameters: scrollToParameters,
+    execute: async (rawArgs, context: ToolContext) => {
+      const args = scrollToParameters.parse(rawArgs ?? {});
+      return manager.withPage(
+        context.log,
+        { overrides: args.connection },
+        async (page) => {
+          const element = await resolveElement(
+            page,
+            args.selector,
+            args.innerSelector
+          );
+
+          if (typeof element.scrollTo !== "function") {
+            throw new UserError(
+              `元素 "${args.selector}" 不支持滚动操作，仅 scroll-view 组件可使用此功能。`
+            );
+          }
+
+          await element.scrollTo(args.x, args.y);
+
+          return toTextResult(
+            `已将元素 "${args.selector}"${args.innerSelector ? ` -> "${args.innerSelector}"` : ""} 滚动到位置 (${args.x}, ${args.y})。`
+          );
+        }
+      );
+    },
+  };
+}
+
+function createGetAttributesTool(manager: WeappAutomatorManager): AnyTool {
+  return {
+    name: "element_getAttributes",
+    description: "获取元素的特性值。names 为特性名数组（如 ['class', 'id', 'data-index']）。如需获取自定义组件内部元素的特性，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器。",
+    parameters: getAttributesParameters,
+    execute: async (rawArgs, context: ToolContext) => {
+      const args = getAttributesParameters.parse(rawArgs ?? {});
+      return manager.withPage(
+        context.log,
+        { overrides: args.connection },
+        async (page) => {
+          const element = await resolveElement(
+            page,
+            args.selector,
+            args.innerSelector
+          );
+
+          if (typeof element.attribute !== "function") {
+            throw new UserError(
+              `元素 "${args.selector}" 不支持获取特性。`
+            );
+          }
+
+          const attributes: Record<string, unknown> = {};
+
+          await Promise.all(
+            args.names.map(async (name) => {
+              try {
+                attributes[name] = await element.attribute(name);
+              } catch {
+                attributes[name] = null;
+              }
+            })
+          );
+
+          return toTextResult(
+            formatJson({
+              selector: args.selector,
+              innerSelector: args.innerSelector ?? null,
+              attributes,
             })
           );
         }
