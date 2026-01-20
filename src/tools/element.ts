@@ -86,7 +86,7 @@ export function createElementTools(
 function createTapElementTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_tap",
-    description: "通过 CSS 选择器模拟点击 WXML 元素。如需点击自定义组件内部的元素，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器。",
+    description: "通过 CSS 选择器模拟点击 WXML 元素。如需点击自定义组件内部的元素，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)或标签选择器，innerSelector 设为组件内部元素的选择器。",
     parameters: tapElementParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = tapElementParameters.parse(rawArgs ?? {});
@@ -116,7 +116,7 @@ function createTapElementTool(manager: WeappAutomatorManager): AnyTool {
 function createInputTextTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_input",
-    description: "向指定元素输入文本。如需向自定义组件内部的元素输入，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器。",
+    description: "向指定元素输入文本。如需向自定义组件内部的元素输入，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)或标签选择器，innerSelector 设为组件内部元素的选择器。",
     parameters: inputTextParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = inputTextParameters.parse(rawArgs ?? {});
@@ -143,7 +143,7 @@ function createInputTextTool(manager: WeappAutomatorManager): AnyTool {
 function createCallElementMethodTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_callMethod",
-    description: "调用组件实例指定方法，仅自定义组件可以使用。需要 automator 0.6.0 和基础库 2.9.0 及以上版本。使用 ID 选择器(如 #my-component)定位自定义组件。",
+    description: "调用组件实例指定方法，仅自定义组件可以使用。使用 ID 选择器(如 #my-component)或标签选择器定位自定义组件。",
     parameters: callElementMethodParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = callElementMethodParameters.parse(rawArgs ?? {});
@@ -177,7 +177,7 @@ function createCallElementMethodTool(manager: WeappAutomatorManager): AnyTool {
 function createGetElementDataTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getData",
-    description: "获取组件实例渲染数据，仅自定义组件可以使用。需要 automator 0.6.0 和基础库 2.9.0 及以上版本。使用 ID 选择器(如 #my-component)定位自定义组件。",
+    description: "获取组件实例渲染数据，仅自定义组件可以使用。使用 ID 选择器(如 #my-component)或标签选择器定位自定义组件。",
     parameters: getElementDataParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getElementDataParameters.parse(rawArgs ?? {});
@@ -209,7 +209,7 @@ function createGetElementDataTool(manager: WeappAutomatorManager): AnyTool {
 function createSetElementDataTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_setData",
-    description: "设置组件实例渲染数据，仅自定义组件可以使用。需要 automator 0.6.0 和基础库 2.9.0 及以上版本。使用 ID 选择器(如 #my-component)定位自定义组件。",
+    description: "设置组件实例渲染数据，仅自定义组件可以使用。使用 ID 选择器(如 #my-component)或标签选择器定位自定义组件。",
     parameters: setElementDataParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = setElementDataParameters.parse(rawArgs ?? {});
@@ -237,7 +237,7 @@ function createSetElementDataTool(manager: WeappAutomatorManager): AnyTool {
 function createGetInnerElementTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getInnerElement",
-    description: "在元素范围内获取元素，相当于 element.$(selector)。重要：操作自定义组件内部元素时，必须先通过 ID 选择器(如 #my-component)定位自定义组件，然后使用此工具获取组件内部的元素。",
+    description: "在元素范围内获取元素，相当于 element.$(selector)。重要：操作自定义组件时，通过 ID 选择器(如 #my-component)或标签选择器定位自定义组件。",
     parameters: getInnerElementParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getInnerElementParameters.parse(rawArgs ?? {});
@@ -291,7 +291,7 @@ function createGetInnerElementTool(manager: WeappAutomatorManager): AnyTool {
 function createGetInnerElementsTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getInnerElements",
-    description: "在元素范围内获取元素数组，相当于 element.$$(selector)。重要：操作自定义组件内部元素时，必须先通过 ID 选择器(如 #my-component)定位自定义组件，然后使用此工具获取组件内部的元素数组。",
+    description: "在元素范围内获取元素数组，相当于 element.$$(selector)。重要：操作自定义组件时，通过 ID 选择器(如 #my-component)或标签选择器定位自定义组件，然后使用此工具获取组件内部的元素数组。",
     parameters: getInnerElementsParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getInnerElementsParameters.parse(rawArgs ?? {});
@@ -350,7 +350,7 @@ function createGetInnerElementsTool(manager: WeappAutomatorManager): AnyTool {
 function createGetElementSizeTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getSize",
-    description: "获取元素大小(宽度和高度)。如需获取自定义组件内部元素的大小，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器。",
+    description: "获取元素大小(宽度和高度)。如需获取自定义组件的大小，请使用 ID 选择器(如 #my-component)或标签选择器。",
     parameters: getElementSizeParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getElementSizeParameters.parse(rawArgs ?? {});
@@ -388,7 +388,7 @@ function createGetElementSizeTool(manager: WeappAutomatorManager): AnyTool {
 function createGetElementWxmlTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getWxml",
-    description: "获取元素 WXML。默认获取内部 WXML(element.wxml())，设置 outer 为 true 可获取包含元素本身的 WXML(element.outerWxml())。如需获取自定义组件内部元素的 WXML，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器。",
+    description: "获取元素 WXML。默认获取内部 WXML(element.wxml())，设置 outer 为 true 可获取包含元素本身的 WXML(element.outerWxml())。如需获取自定义组件的 WXML，请使用 ID 选择器(如 #my-component)或标签选择器。",
     parameters: getElementWxmlParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getElementWxmlParameters.parse(rawArgs ?? {});

@@ -150,9 +150,9 @@ npx weapp-dev-mcp
 
 - `element_tap` – 通过 CSS 选择器点击 WXML 元素
 - `element_input` – 向元素输入文本（适用于 `input` 和 `textarea` 组件）
-- `element_callMethod` – 调用自定义组件实例的方法（需要 ID 选择器）
-- `element_getData` – 获取自定义组件实例的渲染数据（需要 ID 选择器）
-- `element_setData` – 设置自定义组件实例的渲染数据（需要 ID 选择器）
+- `element_callMethod` – 调用自定义组件实例的方法（需要 ID 选择器或标签选择器）
+- `element_getData` – 获取自定义组件实例的渲染数据（需要 ID 选择器或标签选择器）
+- `element_setData` – 设置自定义组件实例的渲染数据（需要 ID 选择器或标签选择器）
 - `element_getInnerElement` – 获取元素内的元素（相当于 `element.$(selector)`）
 - `element_getInnerElements` – 获取元素内的元素数组（相当于 `element.$$(selector)`）
 - `element_getSize` – 获取元素大小（宽度和高度）
@@ -173,7 +173,7 @@ npx weapp-dev-mcp
 
 ### 操作自定义组件
 
-**🔴 重要：必须使用 ID 选择器（如 `#my-component`）来定位自定义组件**
+**🔴 重要：必须使用 ID 选择器（如 `#my-component`）或标签选择器来定位自定义组件**
 
 操作自定义组件时，有两种方法：
 
@@ -188,7 +188,7 @@ npx weapp-dev-mcp
 }
 ```
 
-- `selector`：自定义组件的 ID 选择器
+- `selector`：自定义组件的 ID 选择器或标签选择器
 - `innerSelector`：组件内部元素的选择器
 
 #### 方法二：使用元素内查询工具
@@ -205,4 +205,3 @@ npx weapp-dev-mcp
 #### 限制说明
 
 - `page_waitElement` **不适用于**自定义组件内部元素。请使用 `page_waitTimeout` 配合元素查询工具进行轮询检查。
-- 自定义组件操作（如 `element_callMethod`、`element_getData`、`element_setData`）要求组件具有 `id` 属性。
