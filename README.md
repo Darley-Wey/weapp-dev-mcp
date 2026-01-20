@@ -157,6 +157,7 @@ npx weapp-dev-mcp
 - `element_getInnerElement` – 获取元素内的元素（相当于 `element.$(selector)`），返回元素摘要信息；设置 `withWxml: true` 可额外返回完整 outerWxml
 - `element_getInnerElements` – 获取元素内的元素数组（相当于 `element.$$(selector)`），返回元素摘要信息；设置 `withWxml: true` 可额外返回每个元素的完整 outerWxml
 - `element_getWxml` – 获取元素 WXML（内部或外部）
+- `element_getStyles` – 获取元素的 CSS 样式值，names 参数为样式名数组（如 `['color', 'fontSize']`）
 
 每个工具都接受可选的 `connection` 块来覆盖环境默认值（项目路径、CLI 路径、WebSocket 端点等）。
 

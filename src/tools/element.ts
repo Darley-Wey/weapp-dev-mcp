@@ -65,6 +65,12 @@ const getElementWxmlParameters = connectionContainerSchema.extend({
   outer: z.boolean().optional().default(false),
 });
 
+const getElementStylesParameters = connectionContainerSchema.extend({
+  selector: z.string().trim().min(1),
+  innerSelector: z.string().trim().min(1).optional(),
+  names: z.array(z.string().trim().min(1)),
+});;
+
 export function createElementTools(
   manager: WeappAutomatorManager
 ): AnyTool[] {
@@ -77,6 +83,7 @@ export function createElementTools(
     createGetInnerElementTool(manager),
     createGetInnerElementsTool(manager),
     createGetElementWxmlTool(manager),
+    createGetElementStylesTool(manager),
   ];
 }
 
@@ -363,6 +370,54 @@ function createGetElementWxmlTool(manager: WeappAutomatorManager): AnyTool {
               innerSelector: args.innerSelector ?? null,
               type: args.outer ? "outerWxml" : "wxml",
               wxml: toSerializableValue(wxml),
+            })
+          );
+        }
+      );
+    },
+  };
+}
+
+function createGetElementStylesTool(manager: WeappAutomatorManager): AnyTool {
+  return {
+    name: "element_getStyles",
+    description: "获取元素的样式值。names 为样式名数组（如 ['color', 'fontSize', 'backgroundColor']）。如需获取自定义组件内部元素的样式，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器。",
+    parameters: getElementStylesParameters,
+    execute: async (rawArgs, context: ToolContext) => {
+      const args = getElementStylesParameters.parse(rawArgs ?? {});
+      return manager.withPage(
+        context.log,
+        { overrides: args.connection },
+        async (page) => {
+          const element = await resolveElement(
+            page,
+            args.selector,
+            args.innerSelector
+          );
+
+          if (typeof element.style !== "function") {
+            throw new UserError(
+              `元素 "${args.selector}" 不支持获取样式。`
+            );
+          }
+
+          const styles: Record<string, unknown> = {};
+
+          await Promise.all(
+            args.names.map(async (name) => {
+              try {
+                styles[name] = await element.style(name);
+              } catch {
+                styles[name] = null;
+              }
+            })
+          );
+
+          return toTextResult(
+            formatJson({
+              selector: args.selector,
+              innerSelector: args.innerSelector ?? null,
+              styles,
             })
           );
         }
