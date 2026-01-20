@@ -357,7 +357,7 @@ function createGetInnerElementsTool(manager: WeappAutomatorManager): AnyTool {
 function createGetElementWxmlTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getWxml",
-    description: "获取元素 WXML。默认获取内部 WXML(element.wxml())，设置 outer 为 true 可获取包含元素本身的 WXML(element.outerWxml())。如需获取自定义组件的 WXML，请使用 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器或标签选择器。",
+    description: "获取元素 WXML。默认获取内部 WXML(element.wxml())，设置 outer 为 true 可获取包含元素本身的 WXML(element.outerWxml())。如需获取自定义组件的 WXML，请使用 ID 选择器或标签选择器。",
     parameters: getElementWxmlParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getElementWxmlParameters.parse(rawArgs ?? {});
@@ -396,7 +396,7 @@ function createGetElementWxmlTool(manager: WeappAutomatorManager): AnyTool {
 function createGetElementStylesTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getStyles",
-    description: "获取元素的样式值。names 为样式名数组（如 ['color', 'fontSize', 'backgroundColor']）。如需获取自定义组件内部元素的样式，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器。",
+    description: "获取元素的样式值。names 为样式名数组（如 ['color', 'fontSize', 'backgroundColor']）。如需获取自定义组件的样式，请使用 ID 选择器(如 #my-component)或标签选择器。",
     parameters: getElementStylesParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getElementStylesParameters.parse(rawArgs ?? {});
@@ -444,7 +444,7 @@ function createGetElementStylesTool(manager: WeappAutomatorManager): AnyTool {
 function createScrollToTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_scrollTo",
-    description: "滚动 scroll-view 组件到指定位置。仅适用于 scroll-view 组件。如需滚动自定义组件内部的 scroll-view，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部 scroll-view 的选择器。",
+    description: "滚动 scroll-view 组件到指定位置。仅适用于 scroll-view 组件。如需滚动自定义组件内部的 scroll-view，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)或标签选择器，innerSelector 设为组件内部 scroll-view 的选择器。",
     parameters: scrollToParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = scrollToParameters.parse(rawArgs ?? {});
@@ -478,7 +478,7 @@ function createScrollToTool(manager: WeappAutomatorManager): AnyTool {
 function createGetAttributesTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_getAttributes",
-    description: "获取元素的特性值。names 为特性名数组（如 ['class', 'id', 'data-index']）。如需获取自定义组件内部元素的特性，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)，innerSelector 设为组件内部元素的选择器。",
+    description: "获取元素的特性值。names 为特性名数组（如 ['class', 'id', 'data-index']）。如需获取自定义组件的特性，请使用 ID 选择器(如 #my-component)或标签选择器。",
     parameters: getAttributesParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getAttributesParameters.parse(rawArgs ?? {});
