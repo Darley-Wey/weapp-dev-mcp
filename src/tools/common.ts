@@ -40,13 +40,15 @@ export function buildUrl(
   path: string,
   query?: Record<string, string>
 ): string {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
   if (!query || Object.keys(query).length === 0) {
-    return path;
+    return normalizedPath;
   }
   const searchParams = new URLSearchParams(query);
-  const separator = path.includes("?") ? "&" : "?";
+  const separator = normalizedPath.includes("?") ? "&" : "?";
   const search = searchParams.toString();
-  return search ? `${path}${separator}${search}` : path;
+  return search ? `${normalizedPath}${separator}${search}` : normalizedPath;
 }
 
 export function formatJson(value: unknown): string {
