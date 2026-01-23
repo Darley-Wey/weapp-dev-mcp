@@ -60,7 +60,7 @@ export function createPageTools(manager: WeappAutomatorManager): AnyTool[] {
 function createGetElementTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "page_getElement",
-    description: "通过选择器获取页面元素。设置 withWxml 为 true 可额外返回元素的完整 outerWxml。",
+    description: "通过选择器获取页面元素，相当于 page.$(selector)。返回每个元素的摘要信息（tagName、text、value、size、offset）；设置 withWxml 为 true 可额外返回元素的完整 outerWxml。",
     parameters: getElementParameters,
     execute: async (rawArgs, context: ToolContext) => {
       const args = getElementParameters.parse(rawArgs ?? {});
