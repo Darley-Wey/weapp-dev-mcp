@@ -84,6 +84,11 @@ const getAttributesParameters = connectionContainerSchema.extend({
   names: z.array(z.string().trim().min(1)),
 });
 
+const getBoundingClientRectParameters = connectionContainerSchema.extend({
+  selector: z.string().trim().min(1),
+  innerSelector: z.string().trim().min(1).optional(),
+});
+
 export function createElementTools(
   manager: WeappAutomatorManager
 ): AnyTool[] {
@@ -99,6 +104,7 @@ export function createElementTools(
     createGetElementStylesTool(manager),
     createScrollToTool(manager),
     createGetAttributesTool(manager),
+    createGetBoundingClientRectTool(manager),
   ];
 }
 
@@ -515,6 +521,56 @@ function createGetAttributesTool(manager: WeappAutomatorManager): AnyTool {
               selector: args.selector,
               innerSelector: args.innerSelector ?? null,
               attributes,
+            })
+          );
+        }
+      );
+    },
+  };
+}
+
+function createGetBoundingClientRectTool(manager: WeappAutomatorManager): AnyTool {
+  return {
+    name: "element_getBoundingClientRect",
+    description: "获取元素相对于视口的边界矩形信息（left、top、width、height、right、bottom）。此方法返回的是考虑 CSS transform 变换后的实际渲染尺寸和位置。支持跨组件查询：若需获取自定义组件内部元素，可将 selector 设为组件选择器，innerSelector 设为内部元素选择器。注意：目前仅支持 ID 选择器、类选择器。",
+    parameters: getBoundingClientRectParameters,
+    execute: async (rawArgs, context: ToolContext) => {
+      const args = getBoundingClientRectParameters.parse(rawArgs ?? {});
+      const { selector, innerSelector } = args;
+
+      return manager.withMiniProgram(
+        context.log,
+        { overrides: args.connection },
+        async (miniProgram) => {
+          const result = await miniProgram.evaluate(
+            (sel: string, innerSel?: string) => {
+              return new Promise((resolve, reject) => {
+                // @ts-expect-error - wx 是小程序运行时全局对象
+                const query = wx.createSelectorQuery();
+
+                // 如果有 innerSelector，使用 >>> 拼接成穿透选择器，这比 selectComponent 更可靠
+                const fullSelector = innerSel ? `${sel} >>> ${innerSel}` : sel;
+
+                query.select(fullSelector).boundingClientRect();
+
+                query.exec((res: unknown[]) => {
+                  if (res && res.length > 0 && res[0]) {
+                    resolve(res[0]);
+                  } else {
+                    reject(new Error(`Element not found or not rendered: "${fullSelector}". (exec returned ${JSON.stringify(res)})`));
+                  }
+                });
+              });
+            },
+            selector,
+            innerSelector
+          );
+
+          return toTextResult(
+            formatJson({
+              selector,
+              innerSelector: innerSelector ?? null,
+              boundingClientRect: toSerializableValue(result),
             })
           );
         }
