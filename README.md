@@ -157,6 +157,7 @@ npx weapp-dev-mcp
 - `element_getInnerElements` – 获取元素内的元素数组（相当于 `element.$$(selector)`）
 - `element_getSize` – 获取元素大小（宽度和高度）
 - `element_getWxml` – 获取元素 WXML（内部或外部）
+- `element_getBoundingClientRect` – 获取元素相对于视口的边界矩形信息（left、top、width、height、right、bottom），考虑 CSS transform 变换（目前仅支持 ID 选择器、类选择器）
 
 每个工具都接受可选的 `connection` 块来覆盖环境默认值（项目路径、CLI 路径、WebSocket 端点等）。
 
