@@ -10,34 +10,27 @@
 
 ## 快速开始（npm 包）
 
-`@yfme/weapp-dev-mcp` 已发布到 npm，普通使用者无需克隆仓库或手动执行 `node dist/index.js`。下面的命令会直接从 npm 下载可执行版本。
+`@yfme/weapp-dev-mcp` 已发布到 npm，普通使用者无需克隆仓库或手动执行 `node dist/index.js`。
 
-### 使用 npx 临时运行（推荐）
+### 使用 npx 运行
 
 ```bash
-npx -y \
-  -p @modelcontextprotocol/sdk@1.17.2 \
-  -p fastmcp@3.23.0 \
-  -p @yfme/weapp-dev-mcp \
-  weapp-dev-mcp
+npx -y @yfme/weapp-dev-mcp
 ```
-
-- `-y` 自动确认依赖安装。
-- 通过 `-p` 显式钉住 `@modelcontextprotocol/sdk@1.17.2` 与 `fastmcp@3.23.0`，可规避新版 SDK 在启动阶段抛出的 “Server does not support completions” 错误。
-- `weapp-dev-mcp` 是包中导出的 CLI 名称。
 
 ### 安装到项目/全局
 
 ```bash
-npm install --save-dev \
-  @modelcontextprotocol/sdk@1.17.2 \
-  fastmcp@3.23.0 \
-  @yfme/weapp-dev-mcp
-
-npx weapp-dev-mcp
+npm install -g @yfme/weapp-dev-mcp
+weapp-dev-mcp
 ```
 
-或使用 `npm install -g ... && weapp-dev-mcp`。同样需要锁定 SDK 和 fastmcp 的版本。
+或作为项目依赖：
+
+```bash
+npm install --save-dev @yfme/weapp-dev-mcp
+npx weapp-dev-mcp
+```
 
 > 只有在本仓库内开发时，才建议直接运行 `node dist/index.js`。一般用户请按照以上 npm 包方式启动。
 
@@ -47,26 +40,62 @@ npx weapp-dev-mcp
 
 要在 Claude Desktop 或其他 MCP 客户端中使用此服务器，请在配置文件中添加：
 
+```json
+{
+  "mcpServers": {
+    "weapp-dev": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@yfme/weapp-dev-mcp"
+      ],
+      "env": {
+        "WEAPP_WS_ENDPOINT": "ws://localhost:9420"
+      }
+    }
+  }
+}
+```
 
-> ```json
-> {
->   "mcpServers": {
->     "weapp-dev": {
->       "command": "npx",
->       "args": [
->         "-y",
->         "-p", "@modelcontextprotocol/sdk@1.17.2",
->         "-p", "fastmcp@3.23.0",
->         "-p", "@yfme/weapp-dev-mcp",
->         "weapp-dev-mcp"
->       ],
->       "env": {
->         "WEAPP_WS_ENDPOINT": "ws://localhost:9420"
->       }
->     }
->   }
-> }
-> ```
+### Claude Code 自动批准工具权限
+由于使用 Claude Code 调用 MCP 工具时，会触发工具调用权限申请，此时可能会丢失 MCP 与微信开发者工具的连接状态，由于获取控制台输出高度依赖连接状态，此时会无法连贯的获取输出日志，所以建议手动添加权限：
+
+在项目目录下创建 `.claude/settings.local.json` 文件，或在已有文件添加以下内容后即可免确认直接调用工具，或者根据需要添加您允许免确认调用的工具：
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__weapp-dev-mcp__mp_ensureConnection",
+      "mcp__weapp-dev-mcp__mp_navigate",
+      "mcp__weapp-dev-mcp__mp_screenshot",
+      "mcp__weapp-dev-mcp__mp_callWx",
+      "mcp__weapp-dev-mcp__mp_getLogs",
+      "mcp__weapp-dev-mcp__mp_currentPage",
+      "mcp__weapp-dev-mcp__page_getElement",
+      "mcp__weapp-dev-mcp__page_getElements",
+      "mcp__weapp-dev-mcp__page_waitElement",
+      "mcp__weapp-dev-mcp__page_waitTimeout",
+      "mcp__weapp-dev-mcp__page_getData",
+      "mcp__weapp-dev-mcp__page_setData",
+      "mcp__weapp-dev-mcp__page_callMethod",
+      "mcp__weapp-dev-mcp__element_tap",
+      "mcp__weapp-dev-mcp__element_input",
+      "mcp__weapp-dev-mcp__element_callMethod",
+      "mcp__weapp-dev-mcp__element_getData",
+      "mcp__weapp-dev-mcp__element_setData",
+      "mcp__weapp-dev-mcp__element_getInnerElement",
+      "mcp__weapp-dev-mcp__element_getInnerElements",
+      "mcp__weapp-dev-mcp__element_getWxml",
+      "mcp__weapp-dev-mcp__element_getStyles",
+      "mcp__weapp-dev-mcp__element_scrollTo",
+      "mcp__weapp-dev-mcp__element_getAttributes"
+    ]
+  }
+}
+```
+
+> **注意：** 工具名称格式为 `mcp__<服务器名称>__<工具名称>`，请确保服务器名称与您的 MCP 配置中的名称一致。
 
 ### 启动微信开发者工具
 
@@ -121,11 +150,6 @@ npx weapp-dev-mcp
 > **注意：** 当启动开发者工具（`launch` 模式）时，必须通过 MCP 工具参数提供小程序项目目录：在执行操作前通过 `connection.projectPath` 提供（例如通过 `mp_ensureConnection`）。该值一旦建立，将在后续调用中持久化。
 
 工具调用可以通过 `connection` 对象覆盖这些默认值中的大部分。
-
-### 常见错误
-
-- **`Server does not support completions (required for completion/complete)`**  
-  新版 `@modelcontextprotocol/sdk` 在启动阶段强制要求 completions 能力，而当前版本的 `weapp-dev-mcp` 尚未实现相关接口。按照“快速开始”章节的命令显式安装 `@modelcontextprotocol/sdk@1.17.2` 与 `fastmcp@3.23.0` 可立即规避；未来版本将内置兼容逻辑。
 
 ## 可用工具
 

@@ -167,9 +167,10 @@ export class WeappAutomatorManager {
   private attachLogging(miniProgram: MiniProgramInstance, log: ToolLogger) {
     miniProgram.on("console", (event: unknown) => {
       const serialized = toSerializable(event);
+      const args = (event as any)?.args;
       const logEntry: ConsoleLogEntry = {
         type: typeof (event as any)?.type === "string" ? (event as any).type : "log",
-        message: typeof (event as any)?.text === "string" ? (event as any).text : String(serialized),
+        message: Array.isArray(args) ? args.map(arg => typeof arg === "string" ? arg : JSON.stringify(arg)).join(" ") : String(serialized),
         timestamp: Date.now(),
         data: serialized,
       };

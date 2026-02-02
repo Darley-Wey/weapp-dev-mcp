@@ -38,7 +38,7 @@ const getElementParameters = connectionContainerSchema.extend({
   selector: z.string().trim().min(1),
   innerSelector: z.string().trim().min(1).optional(),
   withWxml: z.boolean().optional().default(false),
-});;
+});
 
 const getElementsParameters = connectionContainerSchema.extend({
   selector: z.string().trim().min(1),
