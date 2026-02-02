@@ -57,6 +57,46 @@ npx weapp-dev-mcp
 }
 ```
 
+### Claude Code 自动批准工具权限
+由于使用 Claude Code 调用 MCP 工具时，会触发工具调用权限申请，此时可能会丢失 MCP 与微信开发者工具的连接状态，由于获取控制台输出高度依赖连接状态，此时会无法连贯的获取输出日志，所以建议手动添加权限：
+
+在项目目录下创建 `.claude/settings.local.json` 文件，或在已有文件添加以下内容后即可免确认直接调用工具，或者根据需要添加您允许免确认调用的工具：
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__weapp-dev-mcp__mp_ensureConnection",
+      "mcp__weapp-dev-mcp__mp_navigate",
+      "mcp__weapp-dev-mcp__mp_screenshot",
+      "mcp__weapp-dev-mcp__mp_callWx",
+      "mcp__weapp-dev-mcp__mp_getLogs",
+      "mcp__weapp-dev-mcp__mp_currentPage",
+      "mcp__weapp-dev-mcp__page_getElement",
+      "mcp__weapp-dev-mcp__page_getElements",
+      "mcp__weapp-dev-mcp__page_waitElement",
+      "mcp__weapp-dev-mcp__page_waitTimeout",
+      "mcp__weapp-dev-mcp__page_getData",
+      "mcp__weapp-dev-mcp__page_setData",
+      "mcp__weapp-dev-mcp__page_callMethod",
+      "mcp__weapp-dev-mcp__element_tap",
+      "mcp__weapp-dev-mcp__element_input",
+      "mcp__weapp-dev-mcp__element_callMethod",
+      "mcp__weapp-dev-mcp__element_getData",
+      "mcp__weapp-dev-mcp__element_setData",
+      "mcp__weapp-dev-mcp__element_getInnerElement",
+      "mcp__weapp-dev-mcp__element_getInnerElements",
+      "mcp__weapp-dev-mcp__element_getWxml",
+      "mcp__weapp-dev-mcp__element_getStyles",
+      "mcp__weapp-dev-mcp__element_scrollTo",
+      "mcp__weapp-dev-mcp__element_getAttributes"
+    ]
+  }
+}
+```
+
+> **注意：** 工具名称格式为 `mcp__<服务器名称>__<工具名称>`，请确保服务器名称与您的 MCP 配置中的名称一致。
+
 ### 启动微信开发者工具
 
 在使用 MCP 服务器之前，需要先启动微信开发者工具并开启 WebSocket 服务。
