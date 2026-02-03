@@ -185,6 +185,7 @@ npx weapp-dev-mcp
 - `element_getStyles` – 获取元素的 CSS 样式值，names 参数为样式名数组（如 `['color', 'fontSize']`）
 - `element_scrollTo` – 滚动 scroll-view 组件到指定位置（x, y）
 - `element_getAttributes` – 获取元素的特性值，names 参数为特性名数组（如 `['class', 'id', 'data-index']`）
+- `element_getBoundingClientRect` – 获取元素相对于视口的边界矩形信息（left、top、width、height、right、bottom），考虑 CSS transform 变换（目前仅支持 ID 选择器、类选择器）
 
 每个工具都接受可选的 `connection` 块来覆盖环境默认值（项目路径、CLI 路径、WebSocket 端点等）。
 
