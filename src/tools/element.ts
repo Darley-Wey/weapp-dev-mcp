@@ -542,29 +542,39 @@ function createGetBoundingClientRectTool(manager: WeappAutomatorManager): AnyToo
         context.log,
         { overrides: args.connection },
         async (miniProgram) => {
-          const result = await miniProgram.evaluate(
-            (sel: string, innerSel?: string) => {
-              return new Promise((resolve, reject) => {
-                // @ts-expect-error - wx 是小程序运行时全局对象
-                const query = wx.createSelectorQuery();
+          const fullSelector = innerSelector ? `${selector} >>> ${innerSelector}` : selector;
 
-                // 如果有 innerSelector，使用 >>> 拼接成穿透选择器，这比 selectComponent 更可靠
-                const fullSelector = innerSel ? `${sel} >>> ${innerSel}` : sel;
+          let result;
+          try {
+            result = await miniProgram.evaluate(
+              (sel: string, innerSel?: string) => {
+                return new Promise((resolve, reject) => {
+                  // @ts-expect-error - wx 是小程序运行时全局对象
+                  const query = wx.createSelectorQuery();
 
-                query.select(fullSelector).boundingClientRect();
+                  // 如果有 innerSelector，使用 >>> 拼接成穿透选择器，这比 selectComponent 更可靠
+                  const full = innerSel ? `${sel} >>> ${innerSel}` : sel;
 
-                query.exec((res: unknown[]) => {
-                  if (res && res.length > 0 && res[0]) {
-                    resolve(res[0]);
-                  } else {
-                    reject(new Error(`Element not found or not rendered: "${fullSelector}". (exec returned ${JSON.stringify(res)})`));
-                  }
+                  query.select(full).boundingClientRect();
+
+                  query.exec((res: unknown[]) => {
+                    if (res && res.length > 0 && res[0]) {
+                      resolve(res[0]);
+                    } else {
+                      reject(new Error(`Element not found or not rendered: "${full}". (exec returned ${JSON.stringify(res)})`));
+                    }
+                  });
                 });
-              });
-            },
-            selector,
-            innerSelector
-          );
+              },
+              selector,
+              innerSelector
+            );
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            throw new UserError(
+              `获取元素 "${fullSelector}" 的边界矩形失败: ${message}`
+            );
+          }
 
           return toTextResult(
             formatJson({

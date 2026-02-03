@@ -89,7 +89,8 @@ npx weapp-dev-mcp
       "mcp__weapp-dev-mcp__element_getWxml",
       "mcp__weapp-dev-mcp__element_getStyles",
       "mcp__weapp-dev-mcp__element_scrollTo",
-      "mcp__weapp-dev-mcp__element_getAttributes"
+      "mcp__weapp-dev-mcp__element_getAttributes",
+      "mcp__weapp-dev-mcp__element_getBoundingClientRect"
     ]
   }
 }
