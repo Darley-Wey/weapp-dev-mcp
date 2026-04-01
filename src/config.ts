@@ -55,6 +55,22 @@ export const connectionOverridesSchema = z
 
 export type ConnectionOverrides = z.infer<typeof connectionOverridesSchema>;
 
+function mergeDefined<T extends Record<string, unknown>>(
+  ...sources: T[]
+): T {
+  const result = {} as T;
+
+  for (const source of sources) {
+    for (const [key, value] of Object.entries(source)) {
+      if (value !== undefined) {
+        result[key as keyof T] = value as T[keyof T];
+      }
+    }
+  }
+
+  return result;
+}
+
 function fromPrevious(
   previous?: WeappConnectionConfig
 ): ConnectionOverrides {
@@ -113,11 +129,7 @@ export function resolveConfig(
     ? connectionOverridesSchema.parse(overrides)
     : {};
 
-  const merged: ConnectionOverrides = {
-    ...base,
-    ...envInput,
-    ...overrideConfig,
-  };
+  const merged = mergeDefined(base, envInput, overrideConfig);
 
   const mode: AutomatorMode =
     merged.mode ??

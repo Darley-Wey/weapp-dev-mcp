@@ -13,19 +13,13 @@ import {
   toTextResult,
   waitOnPage,
   parseSelectorWithIndex,
+  withUserErrorResult,
 } from "./common.js";
 
 const tapElementParameters = connectionContainerSchema.extend({
   selector: z.string().trim().min(1),
   innerSelector: z.string().trim().min(1).optional(),
   waitMs: z.coerce.number().int().nonnegative().optional(),
-  waitForInteractive: z.boolean().optional().default(true),
-  x: z.coerce.number().optional(),
-  y: z.coerce.number().optional(),
-  /** 验证点击是否成功（页面路径变化或元素状态变化） */
-  verify: z.boolean().optional().default(true),
-  /** 验证超时时间（毫秒） */
-  verifyTimeout: z.coerce.number().int().nonnegative().optional().default(3000),
 });
 
 const inputTextParameters = connectionContainerSchema.extend({
@@ -119,23 +113,17 @@ export function createElementTools(
 function createTapElementTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "element_tap",
-    description: "通过 CSS 选择器模拟点击 WXML 元素。支持 [index=N] 语法选择第 N 个元素。支持 x/y 坐标偏移点击。增强稳定性：等待元素可交互状态，点击后自动验证页面路径是否变化。",
+    description: "通过 CSS 选择器模拟点击 WXML 元素。支持 [index=N] 语法选择第 N 个元素。如需点击自定义组件内部的元素，请使用 innerSelector 参数：selector 设为组件 ID 选择器(如 #my-component)或标签选择器，innerSelector 设为组件内部元素的选择器。",
     parameters: tapElementParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = tapElementParameters.parse(rawArgs ?? {});
       const waitMs = args.waitMs;
-      const verify = args.verify ?? true;
-      const verifyTimeout = args.verifyTimeout ?? 3000;
 
-      return manager.withMiniProgram(
+      return manager.withPage(
         context.log,
         { overrides: args.connection },
-        async (miniProgram) => {
-          const page = await miniProgram.currentPage();
-          if (!page) {
-            throw new UserError("当前没有活动页面");
-          }
-
+        async (page) => {
           let selector = args.selector;
           let indexHint: number | undefined;
 
@@ -145,77 +133,62 @@ function createTapElementTool(manager: WeappAutomatorManager): AnyTool {
             indexHint = parsed.index;
           }
 
-          if (typeof page.$$ !== "function") {
-            throw new UserError("当前页面不支持查询元素。");
-          }
+          let element;
+          if (indexHint === undefined) {
+            element = await resolveElement(
+              page,
+              args.selector,
+              args.innerSelector
+            );
+          } else {
+            if (typeof page.$$ !== "function") {
+              throw new UserError("当前页面不支持查询元素数组。");
+            }
 
-          let elements = await page.$$(selector);
-          if (!Array.isArray(elements) || elements.length === 0) {
-            throw new UserError(`未找到元素: "${selector}"`);
-          }
+            let elements = await page.$$(selector);
+            if (!Array.isArray(elements) || elements.length === 0) {
+              throw new UserError(`未找到元素: "${selector}"`);
+            }
 
-          if (indexHint !== undefined) {
             if (indexHint < 0 || indexHint >= elements.length) {
               throw new UserError(`索引 ${indexHint} 超出范围 (0-${elements.length - 1})。`);
             }
-            elements = [elements[indexHint]];
-          }
 
-          const element = elements[0];
+            element = elements[indexHint];
 
-          if (args.waitForInteractive) {
-            try {
-              await element.waitFor?.(500);
-            } catch {
-            }
-          }
-
-          const originalPath = page.path;
-          let originalRect;
-          try {
-            originalRect = await element.boundingClientRect?.();
-          } catch {
-          }
-
-          if (args.x !== undefined || args.y !== undefined) {
-            if (typeof element.tap === "function") {
-              await element.tap();
-            }
-          } else {
-            await element.tap();
-          }
-
-          let verifyResult = "";
-          if (verify) {
-            const startTime = Date.now();
-            while (Date.now() - startTime < verifyTimeout) {
-              await new Promise(resolve => setTimeout(resolve, 200));
-              try {
-                const currentPage = await miniProgram.currentPage();
-                const newPath = currentPage?.path;
-                if (newPath && newPath !== originalPath) {
-                  verifyResult = ` 验证成功：页面已从 "${originalPath}" 跳转到 "${newPath}"`;
-                  break;
-                }
-              } catch (e) {
-                context.log.warn(`验证过程出现异常: ${e}`);
+            if (args.innerSelector) {
+              if (typeof element.$ !== "function") {
+                throw new UserError(`元素 "${args.selector}" 不支持查询内部元素。`);
               }
+              const inner = await element.$(args.innerSelector);
+              if (!inner) {
+                throw new UserError(
+                  `在元素 "${args.selector}" 内未找到选择器 "${args.innerSelector}" 对应的元素。`
+                );
+              }
+              element = inner;
             }
-            if (!verifyResult) {
-              verifyResult = ` ⚠️ 点击后页面路径未变化 (${originalPath})，请确认是否需要 verify=false`;
-            }
+          }
+
+          try {
+            await element.tap();
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new UserError(
+              `点击元素 "${args.selector}"${args.innerSelector ? ` -> "${args.innerSelector}"` : ""} 失败: ${message}`
+            );
           }
 
           if (waitMs) {
-            await new Promise(resolve => setTimeout(resolve, waitMs));
+            await waitOnPage(page, waitMs);
           }
 
           return toTextResult(
-            `已点击元素 "${args.selector}"${indexHint !== undefined ? `[index=${indexHint}]` : ""}${args.innerSelector ? ` -> "${args.innerSelector}"` : ""}${args.x !== undefined || args.y !== undefined ? ` (坐标偏移: ${args.x ?? 0}, ${args.y ?? 0})` : ""}${waitMs ? ` 并等待 ${waitMs}ms` : ""}${verify ? verifyResult : ""}。`
+            `已点击元素 "${args.selector}"${args.innerSelector ? ` -> "${args.innerSelector}"` : ""}${waitMs ? ` 并等待 ${waitMs}ms` : ""}。`
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -224,7 +197,8 @@ function createInputTextTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_input",
     description: "向指定元素输入文本。",
     parameters: inputTextParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = inputTextParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -242,7 +216,7 @@ function createInputTextTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -251,7 +225,8 @@ function createCallElementMethodTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_callMethod",
     description: "调用组件实例指定方法，仅自定义组件可以使用。",
     parameters: callElementMethodParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = callElementMethodParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -276,7 +251,7 @@ function createCallElementMethodTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -285,7 +260,8 @@ function createGetElementDataTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_getData",
     description: "获取组件实例渲染数据，仅自定义组件可以使用。",
     parameters: getElementDataParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = getElementDataParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -308,7 +284,7 @@ function createGetElementDataTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -317,7 +293,8 @@ function createSetElementDataTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_setData",
     description: "设置组件实例渲染数据，仅自定义组件可以使用。",
     parameters: setElementDataParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = setElementDataParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -336,7 +313,7 @@ function createSetElementDataTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -345,7 +322,8 @@ function createGetInnerElementTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_getInnerElement",
     description: "在元素范围内获取元素，相当于 element.$(selector)。设置 withWxml 为 true 可额外返回每个元素的完整 outerWxml。",
     parameters: getInnerElementParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = getInnerElementParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -382,7 +360,7 @@ function createGetInnerElementTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -391,7 +369,8 @@ function createGetInnerElementsTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_getInnerElements",
     description: "在元素范围内获取元素数组，相当于 element.$$(selector)。设置 withWxml 为 true 可额外返回每个元素的完整 outerWxml。",
     parameters: getInnerElementsParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = getInnerElementsParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -437,7 +416,7 @@ function createGetInnerElementsTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -446,7 +425,8 @@ function createGetElementWxmlTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_getWxml",
     description: "获取元素 WXML。默认获取内部 WXML(element.wxml())，设置 outer 为 true 可获取包含元素本身的 WXML(element.outerWxml())。",
     parameters: getElementWxmlParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = getElementWxmlParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -476,7 +456,7 @@ function createGetElementWxmlTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -485,7 +465,8 @@ function createGetElementStylesTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_getStyles",
     description: "获取元素的样式值。names 为样式名数组（如 ['color', 'fontSize', 'backgroundColor']）。",
     parameters: getElementStylesParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = getElementStylesParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -524,7 +505,7 @@ function createGetElementStylesTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -533,7 +514,8 @@ function createScrollToTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_scrollTo",
     description: "滚动 scroll-view 组件到指定位置。仅适用于 scroll-view 组件。",
     parameters: scrollToParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = scrollToParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -558,7 +540,7 @@ function createScrollToTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -567,7 +549,8 @@ function createGetAttributesTool(manager: WeappAutomatorManager): AnyTool {
     name: "element_getAttributes",
     description: "获取元素的特性值。names 为特性名数组（如 ['class', 'id', 'data-index']）。",
     parameters: getAttributesParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = getAttributesParameters.parse(rawArgs ?? {});
       return manager.withPage(
         context.log,
@@ -606,7 +589,7 @@ function createGetAttributesTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -615,7 +598,8 @@ function createGetBoundingClientRectTool(manager: WeappAutomatorManager): AnyToo
     name: "element_getBoundingClientRect",
     description: "获取元素相对于视口的边界矩形信息（left、top、width、height、right、bottom）。此方法返回的是考虑 CSS transform 变换后的实际渲染尺寸和位置。支持跨组件查询：若需获取自定义组件内部元素，可将 selector 设为组件选择器，innerSelector 设为内部元素选择器。注意：目前仅支持 ID 选择器、类选择器。",
     parameters: getBoundingClientRectParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = getBoundingClientRectParameters.parse(rawArgs ?? {});
       const { selector, innerSelector } = args;
 
@@ -666,6 +650,6 @@ function createGetBoundingClientRectTool(manager: WeappAutomatorManager): AnyToo
           );
         }
       );
-    },
+      }),
   };
 }

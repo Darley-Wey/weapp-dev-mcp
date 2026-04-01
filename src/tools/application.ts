@@ -1,5 +1,4 @@
 import {
-  UserError,
   imageContent,
   type ContentResult,
 } from "fastmcp";
@@ -11,14 +10,13 @@ import {
   ToolContext,
   buildUrl,
   connectionContainerSchema,
-  connectionOnlyParameters,
   ensureConnectionParameters,
   formatJson,
   querySchema,
-  serializePageSummary,
   toSerializableValue,
+  toErrorResult,
   toTextResult,
-  waitOnPage,
+  withUserErrorResult,
 } from "./common.js";
 
 const navigateParameters = connectionContainerSchema
@@ -79,26 +77,25 @@ function createEnsureConnectionTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "mp_ensureConnection",
     description:
-      "检查小程序自动化会话是否就绪。可选择覆盖连接设置或强制重连。",
+      "检查小程序自动化会话是否就绪。先调用这个工具，再调用 mp_screenshot、page_* 或 element_* 工具。若失败，优先用 reconnect=true 重试一次；若返回项目选择提示，则传 projectSelection。",
     parameters: ensureConnectionParameters,
-    execute: async (rawArgs, context: ToolContext) => {
-      const args = ensureConnectionParameters.parse(rawArgs ?? {});
-      
-      // 如果用户提供了 projectSelection（回复选择），处理它
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
+        const args = ensureConnectionParameters.parse(rawArgs ?? {});
+
       if (args.projectSelection) {
         const selected = await manager.consumePendingProject(args.projectSelection);
         if (selected) {
-          // 自动设置默认项目
           await manager.setDefaultProject(selected.path);
           context.log.info(`已选择项目: ${selected.name} (${selected.path})`);
         } else {
           const hint = await manager.getSelectionHint();
-          throw new UserError(
+          return toErrorResult(
             `无效的选择: "${args.projectSelection}"\n\n${hint}`
           );
         }
       }
-      
+
       const result = await manager.withMiniProgram<ContentResult>(
         context.log,
         {
@@ -131,7 +128,7 @@ function createEnsureConnectionTool(manager: WeappAutomatorManager): AnyTool {
       );
 
       return result;
-    },
+      }),
     timeoutMs: 60000,
   };
 }
@@ -142,7 +139,8 @@ function createNavigateTool(manager: WeappAutomatorManager): AnyTool {
     description:
       "在小程序内导航，支持 navigateTo、redirectTo、reLaunch、switchTab 和 navigateBack。",
     parameters: navigateParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = navigateParameters.parse(rawArgs ?? {});
       const transition = args.transition ?? "navigateTo";
       const overrides = args.connection;
@@ -160,7 +158,7 @@ function createNavigateTool(manager: WeappAutomatorManager): AnyTool {
             page = await miniProgram.navigateBack();
           } else {
             if (!providedPath) {
-              throw new UserError(
+              return toErrorResult(
                 "参数 path 是必需的，除非 transition 是 navigateBack。"
               );
             }
@@ -179,7 +177,7 @@ function createNavigateTool(manager: WeappAutomatorManager): AnyTool {
                 page = await miniProgram.switchTab(url);
                 break;
               default:
-                throw new UserError(`不支持的 transition: ${transition}`);
+                return toErrorResult(`不支持的 transition: ${transition}`);
             }
           }
 
@@ -200,7 +198,7 @@ function createNavigateTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -208,9 +206,10 @@ function createScreenshotTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "mp_screenshot",
     description:
-      "截取当前小程序视口的截图。默认返回内联图片，或保存到文件路径。",
+      "截取当前小程序视口的截图。需要已有活动会话；若提示没有活动会话，请先调用 mp_ensureConnection。默认返回内联图片，或保存到文件路径。",
     parameters: screenshotParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = screenshotParameters.parse(rawArgs ?? {});
       return manager.withMiniProgram<ContentResult>(
         context.log,
@@ -230,10 +229,10 @@ function createScreenshotTool(manager: WeappAutomatorManager): AnyTool {
             return toTextResult(`截图已保存到 ${args.path}`);
           }
 
-          throw new UserError("截图未产生图片数据。");
+          return toErrorResult("截图未产生图片数据。");
         }
       );
-    },
+      }),
   };
 }
 
@@ -242,7 +241,8 @@ function createCallWxMethodTool(manager: WeappAutomatorManager): AnyTool {
     name: "mp_callWx",
     description: "调用微信小程序 API 方法，（如 `wx.pageScrollTo`）。",
     parameters: callWxMethodParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = callWxMethodParameters.parse(rawArgs ?? {});
       return manager.withMiniProgram<ContentResult>(
         context.log,
@@ -262,7 +262,7 @@ function createCallWxMethodTool(manager: WeappAutomatorManager): AnyTool {
           );
         }
       );
-    },
+      }),
   };
 }
 
@@ -271,7 +271,8 @@ function createGetConsoleLogsTool(manager: WeappAutomatorManager): AnyTool {
     name: "mp_getLogs",
     description: "获取小程序控制台日志。可选择在获取后清空日志。",
     parameters: getConsoleLogsParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs) =>
+      withUserErrorResult(async () => {
       const args = getConsoleLogsParameters.parse(rawArgs ?? {});
       const logs = manager.getConsoleLogs();
       
@@ -290,7 +291,7 @@ function createGetConsoleLogsTool(manager: WeappAutomatorManager): AnyTool {
           })),
         })
       );
-    },
+      }),
   };
 }
 
@@ -298,9 +299,10 @@ function createCurrentPageTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "mp_currentPage",
     description:
-      "获取当前页面的信息，包括路径、查询参数、尺寸和滚动位置。withData 为 true 时额外返回页面数据。",
+      "获取当前页面的信息，包括路径、查询参数、尺寸和滚动位置。通常在 mp_ensureConnection 成功后立即调用，用于确认当前页面。withData 为 true 时额外返回页面数据。",
     parameters: currentPageParameters,
-    execute: async (rawArgs, context: ToolContext) => {
+    execute: async (rawArgs, context: ToolContext) =>
+      withUserErrorResult(async () => {
       const args = currentPageParameters.parse(rawArgs ?? {});
       return manager.withMiniProgram<ContentResult>(
         context.log,
@@ -331,19 +333,20 @@ function createCurrentPageTool(manager: WeappAutomatorManager): AnyTool {
           return toTextResult(formatJson(result));
         }
       );
-    },
+      }),
   };
 }
 
 function createListProjectsTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "mp_listProjects",
-    description: "列出微信开发者工具中的最近项目，方便选择项目目录。",
+    description: "列出微信开发者工具中的最近项目，方便在 mp_ensureConnection 返回项目选择提示后继续选择项目。",
     parameters: listProjectsParameters,
-    execute: async () => {
+    execute: async () =>
+      withUserErrorResult(async () => {
       const projects = await manager.listRecentProjects();
       const defaultProject = await manager.getDefaultProject();
-      
+
       return toTextResult(
         formatJson({
           defaultProject,
@@ -354,7 +357,7 @@ function createListProjectsTool(manager: WeappAutomatorManager): AnyTool {
           })),
         })
       );
-    },
+      }),
     timeoutMs: 10000,
   };
 }
@@ -362,12 +365,13 @@ function createListProjectsTool(manager: WeappAutomatorManager): AnyTool {
 function createSetDefaultProjectTool(manager: WeappAutomatorManager): AnyTool {
   return {
     name: "mp_setDefaultProject",
-    description: "设置默认的小程序项目路径，设置后下次连接会自动使用该项目。",
+    description: "设置默认的小程序项目路径，设置后下次连接会优先使用该项目。通常用于修复项目选择失败后的后续重试。",
     parameters: setDefaultProjectParameters,
-    execute: async (rawArgs) => {
+    execute: async (rawArgs) =>
+      withUserErrorResult(async () => {
       const args = setDefaultProjectParameters.parse(rawArgs);
       const success = await manager.setDefaultProject(args.projectPath);
-      
+
       if (success) {
         return toTextResult(
           formatJson({
@@ -375,12 +379,9 @@ function createSetDefaultProjectTool(manager: WeappAutomatorManager): AnyTool {
             message: `已设置默认项目: ${args.projectPath}`,
           })
         );
-      } else {
-        throw new UserError(
-          `无效的项目路径或项目目录不存在: ${args.projectPath}`
-        );
       }
-    },
+      return toErrorResult(`无效的项目路径或项目目录不存在: ${args.projectPath}`);
+      }),
     timeoutMs: 5000,
   };
 }

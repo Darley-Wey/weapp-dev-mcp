@@ -68,6 +68,34 @@ export function toTextResult(text: string): ContentResult {
   };
 }
 
+export function toErrorResult(text: string): ContentResult {
+  return {
+    isError: true,
+    content: [
+      {
+        type: "text",
+        text,
+      },
+    ],
+  };
+}
+
+export async function withUserErrorResult<T extends ContentResult>(
+  execute: () => Promise<T>
+): Promise<T> {
+  try {
+    return await execute();
+  } catch (error) {
+    if (error instanceof UserError) {
+      return toErrorResult(error.message) as T;
+    }
+    if (error instanceof z.ZodError) {
+      return toErrorResult(`Invalid parameters: ${error.issues.map((issue) => issue.message).join("; ")}`) as T;
+    }
+    throw error;
+  }
+}
+
 export async function readNamedValues(
   names: string[] | undefined,
   reader: (name: string) => Promise<unknown>,
@@ -254,10 +282,6 @@ export function createFunctionFromSource(
   }
 }
 
-/**
- * 解析带索引的选择器语法，如 "view[index=2]" 或 "view[index=2] .child"
- * 返回 { baseSelector, index } 或 null
- */
 export function parseSelectorWithIndex(selector: string): { baseSelector: string; index: number } | null {
   // 匹配 selector[index=N] 语法
   const match = selector.match(/^(.+?)\[index=(\d+)\]$/);
@@ -268,64 +292,4 @@ export function parseSelectorWithIndex(selector: string): { baseSelector: string
     };
   }
   return null;
-}
-
-/**
- * 等待元素可交互的稳定点击
- * 增加多重检查确保元素真正可点击
- */
-export async function waitForElementInteractive(
-  element: any,
-  options?: { timeout?: number; retryInterval?: number }
-): Promise<void> {
-  const timeout = options?.timeout ?? 5000;
-  const retryInterval = options?.retryInterval ?? 100;
-  const startTime = Date.now();
-  
-  while (Date.now() - startTime < timeout) {
-    try {
-      // 检查元素是否可见
-      const visible = await element.isVisible?.();
-      if (visible === true) {
-        return;
-      }
-      // 如果 isVisible 不可用，尝试获取 boundingClientRect
-      const rect = await element.boundingClientRect?.();
-      if (rect && rect.width > 0 && rect.height > 0) {
-        return;
-      }
-    } catch {
-      // 忽略错误继续重试
-    }
-    await new Promise(resolve => setTimeout(resolve, retryInterval));
-  }
-  
-  // 最后尝试一次，不管结果如何都继续
-  try {
-    await element.isVisible?.();
-  } catch {
-    // ignore
-  }
-}
-
-/**
- * 验证点击操作是否成功
- * 通过比较点击前后的元素状态来判断
- */
-export async function verifyTapAction(
-  element: any,
-  originalRect?: { x: number; y: number; width: number; height: number }
-): Promise<boolean> {
-  try {
-    if (originalRect) {
-      const newRect = await element.boundingClientRect?.();
-      if (newRect) {
-        return Math.abs((newRect as any).left - originalRect.x) < 1 && 
-               Math.abs((newRect as any).top - originalRect.y) < 1;
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
 }

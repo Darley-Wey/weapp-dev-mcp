@@ -196,28 +196,32 @@ export class WeappAutomatorManager {
       config = resolveConfig(overrides, this.config);
     } catch (error) {
       if (error instanceof ConfigError) {
-        throw new UserError(error.message);
+        throw new UserError(this.withRecoveryTag("INVALID_CONNECTION_CONFIG", error.message));
       }
       throw error;
     }
 
-    // 如果是 autoLaunch 模式但没有 projectPath，尝试获取默认项目
     if (config.autoLaunch && config.mode === "connect" && !config.projectPath) {
-      // 1. 先尝试获取默认项目（mp_setDefaultProject 设置的）
-      const defaultProject = await this.getDefaultProject();
-      if (defaultProject) {
-        log.info(`使用默认项目: ${defaultProject}`);
-        config.projectPath = defaultProject;
-      } else {
-        // 2. 没有默认项目，列出最近项目让用户选择
-        const projects = await this.listRecentProjects();
-        
-        // 关键：保存待选择项目，供后续 projectSelection 消费
-        await this.setPendingProjects(projects);
-        
-        // 使用标准化的 Response Tags 格式返回
-        const response = this.formatProjectSelectionResponse(projects, defaultProject);
-        throw new UserError(response);
+      const isPortOpen = await this.isPortInUse(this.getConfiguredPort(config));
+
+      if (!isPortOpen) {
+        const defaultProject = await this.getDefaultProject();
+        if (defaultProject) {
+          log.info(`使用默认项目: ${defaultProject}`);
+          config.projectPath = defaultProject;
+        } else {
+          const projects = await this.listRecentProjects();
+          if (projects.length === 1) {
+            const [onlyProject] = projects;
+            await this.saveProjectPath(onlyProject.path);
+            log.info(`使用唯一项目: ${onlyProject.path}`);
+            config.projectPath = onlyProject.path;
+          } else {
+            await this.setPendingProjects(projects);
+            const response = this.formatProjectSelectionResponse(projects, defaultProject);
+            throw new UserError(this.withRecoveryTag("PROJECT_SELECTION_REQUIRED", response));
+          }
+        }
       }
     }
 
@@ -241,7 +245,7 @@ export class WeappAutomatorManager {
           let needNewConnection = true;
           
           if (config.autoLaunch) {
-            const isPortOpen = await this.isPortInUse(config.port ?? 9420);
+            const isPortOpen = await this.isPortInUse(this.getConfiguredPort(config));
             
             if (isPortOpen) {
               log.info("DevTools is already running, connecting directly...");
@@ -294,9 +298,14 @@ export class WeappAutomatorManager {
         this.config = undefined;
         const message = error instanceof Error ? error.message : String(error);
         throw new UserError(
-          `Failed to ${
-            config.mode === "connect" ? "connect to" : "launch"
-          } WeChat DevTools: ${message}`
+          this.withRecoveryTag(
+            config.mode === "connect"
+              ? "CONNECT_MODE_FAILED"
+              : "LAUNCH_MODE_FAILED",
+            `Failed to ${
+              config.mode === "connect" ? "connect to" : "launch"
+            } WeChat DevTools: ${message}\n\nNext step: retry mp_ensureConnection once with reconnect=true. If auto-launch is enabled and the project is ambiguous, call mp_listProjects or retry mp_ensureConnection with projectSelection.`
+          )
         );
       }
     }
@@ -324,7 +333,10 @@ export class WeappAutomatorManager {
       const page = await miniProgram.currentPage();
       if (!page) {
         throw new UserError(
-          "Mini Program page stack is empty. Ensure the project window is open."
+          this.withRecoveryTag(
+            "NO_ACTIVE_PAGE",
+            "Mini Program page stack is empty. Ensure the project window is open, then call mp_ensureConnection again before using page_* or element_* tools."
+          )
         );
       }
       return handler(page, miniProgram, config);
@@ -467,6 +479,10 @@ export class WeappAutomatorManager {
     });
   }
 
+  private withRecoveryTag(tag: string, message: string): string {
+    return `[${tag}] ${message}`;
+  }
+
   private async isPortInUse(port: number): Promise<boolean> {
     return new Promise((resolve) => {
       const server = new net.Server();
@@ -482,6 +498,30 @@ export class WeappAutomatorManager {
       
       server.listen(port, "127.0.0.1");
     });
+  }
+
+  private getConfiguredPort(config: WeappConnectionConfig): number {
+    if (typeof config.port === "number") {
+      return config.port;
+    }
+
+    if (config.wsEndpoint) {
+      try {
+        const endpoint = new URL(config.wsEndpoint);
+        if (endpoint.port) {
+          return Number(endpoint.port);
+        }
+        if (endpoint.protocol === "wss:") {
+          return 443;
+        }
+        if (endpoint.protocol === "ws:") {
+          return 80;
+        }
+      } catch {
+      }
+    }
+
+    return 9420;
   }
 
   private async isValidWeappProject(projectPath: string): Promise<boolean> {
@@ -531,7 +571,6 @@ export class WeappAutomatorManager {
       } catch {
         userDataBasePath = macOSPath2;
       }
-      console.log(`[MpListProjects] macOS 平台，使用路径: ${userDataBasePath}`);
     } else {
       // Windows: C:\Users\{username}\AppData\Local\{WECHAT_DEVTOOLS_DIR}\User Data
       userDataBasePath = path.join(
@@ -541,7 +580,6 @@ export class WeappAutomatorManager {
         WeappAutomatorManager.WECHAT_DEVTOOLS_DIR,
         "User Data"
       );
-      console.log(`[MpListProjects] Windows 平台，使用路径: ${userDataBasePath}`);
     }
     
     // 查找所有 hash 子目录（可能有多个）
@@ -864,21 +902,15 @@ C. 直接输入项目路径`;
       command = "cmd.exe";
       commandArgs = ["/c", cliPath, ...autoArgs];
     } else if (isMac) {
-      // macOS: 使用 open 命令打开应用并传递参数（解决路径空格问题）
-      command = "open";
-      commandArgs = ["-a", "wechatwebdevtools", "--args", ...autoArgs];
+      command = cliPath;
+      commandArgs = autoArgs;
     } else {
       // 其他 POSIX 系统: 直接执行 CLI
       command = cliPath;
       commandArgs = autoArgs;
     }
     
-    // 构建日志中的命令字符串
-    const logCommand = isWindows 
-      ? `cmd.exe /c ${cliPath}` 
-      : isMac 
-        ? `open -a wechatwebdevtools --args ${autoArgs.join(" ")}`
-        : `${cliPath} ${autoArgs.join(" ")}`;
+    const logCommand = `${cliPath} ${autoArgs.join(" ")}`;
     log.info(`Launching: ${logCommand}`);
     
     const proc = spawn(command, commandArgs, {
