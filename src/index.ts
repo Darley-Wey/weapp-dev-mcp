@@ -25,6 +25,7 @@ server.addPrompts(createPrompts());
 
 server.on("disconnect", async () => {
   await manager.close();
+  process.exit(0);
 });
 
 await server.start({
