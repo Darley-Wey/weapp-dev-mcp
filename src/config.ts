@@ -31,7 +31,8 @@ const argsSchema = z
     const list = Array.isArray(value) ? value : value.split(/\s+/);
     const normalized = list.map((item) => item.trim()).filter(Boolean);
     return normalized.length ? normalized : undefined;
-  });
+  })
+  .optional();
 
 export const connectionOverridesSchema = z
   .object({
@@ -125,9 +126,9 @@ export function resolveConfig(
 
   const base = fromPrevious(previous);
 
-  const overrideConfig = overrides
+  const overrideConfig: ConnectionOverrides = overrides
     ? connectionOverridesSchema.parse(overrides)
-    : {};
+    : { args: undefined };
 
   const merged = mergeDefined(base, envInput, overrideConfig);
 

@@ -24,7 +24,7 @@ export const ensureConnectionParameters = connectionContainerSchema
     projectSelection: z.string().optional(),
   });
 
-export const querySchema = z.record(z.string()).optional();
+export const querySchema = z.record(z.string(), z.string()).optional();
 
 export const stringListSchema = z
   .union([z.string(), z.array(z.string()), z.undefined()])

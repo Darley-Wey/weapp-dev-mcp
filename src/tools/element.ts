@@ -44,7 +44,7 @@ const getElementDataParameters = connectionContainerSchema.extend({
 const setElementDataParameters = connectionContainerSchema.extend({
   selector: z.string().trim().min(1),
   innerSelector: z.string().trim().min(1).optional(),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 
 const getInnerElementParameters = connectionContainerSchema.extend({

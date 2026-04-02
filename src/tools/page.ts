@@ -20,7 +20,7 @@ const getPageDataParameters = connectionContainerSchema.extend({
 });
 
 const setPageDataParameters = connectionContainerSchema.extend({
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 
 const callPageMethodParameters = connectionContainerSchema.extend({
