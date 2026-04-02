@@ -15,20 +15,20 @@
 ### 使用 npx 运行
 
 ```bash
-npx -y weapp-dev-mcp
+npx -y @yfme/weapp-dev-mcp
 ```
 
 ### 安装到项目/全局
 
 ```bash
-npm install -g weapp-dev-mcp
+npm install -g @yfme/weapp-dev-mcp
 weapp-dev-mcp
 ```
 
 或作为项目依赖：
 
 ```bash
-npm install --save-dev weapp-dev-mcp
+npm install --save-dev @yfme/weapp-dev-mcp
 npx weapp-dev-mcp
 ```
 
