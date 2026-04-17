@@ -259,31 +259,37 @@ export class WeappAutomatorManager {
               }
             } else {
               log.info("DevTools not detected, auto launching...");
-              
+
               let projectPath = config.projectPath || process.cwd();
               const isValidProject = await this.isValidWeappProject(projectPath);
-              
+
               if (!isValidProject) {
                 projectPath = "";
                 log.info("Current directory is not a valid weapp project, will open project selector...");
               }
-              
+
               const resolvedConfig = {
                 ...config,
                 projectPath: projectPath || undefined,
               };
               await this.launchDevTools(resolvedConfig, log);
-              
+
               const launchTimeout = config.launchTimeout ?? 45000;
-              log.info(`Waiting ${launchTimeout}ms for DevTools to be ready...`);
-              await new Promise(resolve => setTimeout(resolve, launchTimeout));
+              const port = this.getConfiguredPort(config);
+              log.info(`Polling port ${port} for DevTools readiness (up to ${launchTimeout}ms)...`);
+              const portReady = await this.waitForPort(port, launchTimeout);
+              if (portReady) {
+                log.info(`Port ${port} opened, proceeding to connect`);
+              } else {
+                log.warn(`Port ${port} did not open within ${launchTimeout}ms, attempting connect anyway`);
+              }
             }
           }
-          
+
           if (needNewConnection) {
             const timeoutMs = config.connectTimeout ?? 45000;
-            log.info(`Connecting with ${timeoutMs}ms timeout...`);
-            this.miniProgram = await this.connectWithTimeout(config, timeoutMs);
+            log.info(`Connecting with polling (up to ${timeoutMs}ms)...`);
+            this.miniProgram = await this.connectWithPolling(config, timeoutMs, log);
           }
         } else {
           this.miniProgram = await this.connect(config);
@@ -363,6 +369,61 @@ export class WeappAutomatorManager {
       this.miniProgram = undefined;
       this.config = undefined;
     }
+  }
+
+  /**
+   * 轮询等待端口开放，端口一旦就绪立即返回，无需等满超时
+   */
+  private async waitForPort(
+    port: number,
+    timeoutMs: number,
+    intervalMs: number = 500
+  ): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      if (await this.isPortInUse(port)) {
+        return true;
+      }
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) break;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(intervalMs, remaining)));
+    }
+    return await this.isPortInUse(port);
+  }
+
+  /**
+   * 轮询连接：在总超时时间内多次尝试，一旦成功立即返回，避免等满超时
+   */
+  private async connectWithPolling(
+    config: WeappConnectionConfig,
+    timeoutMs: number,
+    log: ToolLogger,
+    intervalMs: number = 1000,
+    perAttemptTimeoutMs: number = 5000
+  ): Promise<MiniProgramInstance> {
+    const deadline = Date.now() + timeoutMs;
+    let lastError: Error | undefined;
+    let attempt = 0;
+
+    while (Date.now() < deadline) {
+      attempt++;
+      const remaining = deadline - Date.now();
+      const attemptTimeout = Math.max(500, Math.min(remaining, perAttemptTimeoutMs));
+      try {
+        log.debug(`Connect attempt ${attempt} (timeout ${attemptTimeout}ms, remaining ${remaining}ms)`);
+        const instance = await this.connectWithTimeout(config, attemptTimeout);
+        log.info(`Connected on attempt ${attempt}`);
+        return instance;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        log.debug(`Connect attempt ${attempt} failed: ${lastError.message}`);
+        const left = deadline - Date.now();
+        if (left <= 0) break;
+        await new Promise((resolve) => setTimeout(resolve, Math.min(intervalMs, left)));
+      }
+    }
+
+    throw lastError ?? new Error(`Connection timeout after ${timeoutMs}ms`);
   }
 
   /**
