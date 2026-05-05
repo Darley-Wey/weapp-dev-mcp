@@ -21,12 +21,14 @@ export const connectionOnlyParameters = connectionContainerSchema;
 export const ensureConnectionParameters = connectionContainerSchema
   .extend({
     reconnect: z.coerce.boolean().optional().default(false),
+    projectSelection: z.string().optional(),
   });
 
-export const querySchema = z.record(z.string()).optional();
+export const querySchema = z.record(z.string(), z.string()).optional();
 
 export const stringListSchema = z
-  .union([z.string(), z.array(z.string()), z.undefined()])
+  .union([z.string(), z.array(z.string())])
+  .optional()
   .transform((value) => {
     if (!value) {
       return undefined;
@@ -65,6 +67,34 @@ export function toTextResult(text: string): ContentResult {
       },
     ],
   };
+}
+
+export function toErrorResult(text: string): ContentResult {
+  return {
+    isError: true,
+    content: [
+      {
+        type: "text",
+        text,
+      },
+    ],
+  };
+}
+
+export async function withUserErrorResult<T extends ContentResult>(
+  execute: () => Promise<T>
+): Promise<T> {
+  try {
+    return await execute();
+  } catch (error) {
+    if (error instanceof UserError) {
+      return toErrorResult(error.message) as T;
+    }
+    if (error instanceof z.ZodError) {
+      return toErrorResult(`Invalid parameters: ${error.issues.map((issue) => issue.message).join("; ")}`) as T;
+    }
+    throw error;
+  }
 }
 
 export async function readNamedValues(
@@ -251,4 +281,16 @@ export function createFunctionFromSource(
     const message = error instanceof Error ? error.message : String(error);
     throw new UserError(`${context} is invalid: ${message}`);
   }
+}
+
+export function parseSelectorWithIndex(selector: string): { baseSelector: string; index: number } | null {
+  // 匹配 selector[index=N] 语法
+  const match = selector.match(/^(.+?)\[index=(\d+)\]$/);
+  if (match) {
+    return {
+      baseSelector: match[1],
+      index: parseInt(match[2], 10),
+    };
+  }
+  return null;
 }

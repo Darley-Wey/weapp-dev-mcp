@@ -1,7 +1,7 @@
 {
   "name": "@yfme/weapp-dev-mcp",
-  "version": "0.1.7",
-  "description": "FastMCP server for automating WeChat Mini Program developer tooling",
+  "version": "0.2.3",
+  "description": "FastMCP server for automating WeChat Mini Program developer tooling - Enhanced with auto-launch and stability fixes",
   "type": "module",
   "bin": {
     "weapp-dev-mcp": "dist/index.js"
@@ -33,15 +33,15 @@
     "README.md"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.17.2",
-    "fastmcp": "^3.26.10",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "fastmcp": "^3.34.0",
     "miniprogram-automator": "^0.12.1",
-    "zod": "^3.22.4"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@modelcontextprotocol/inspector": "^0.17.2",
-    "@types/node": "^20.12.7",
-    "tsx": "^4.7.0",
-    "typescript": "^5.4.4"
+    "@modelcontextprotocol/inspector": "^0.21.1",
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2"
   }
 }

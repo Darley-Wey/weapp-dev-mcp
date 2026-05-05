@@ -15,12 +15,16 @@ export interface WeappConnectionConfig {
   args?: string[];
   cwd?: string;
   autoClose?: boolean;
+  autoLaunch?: boolean;
+  launchTimeout?: number;
+  connectTimeout?: number;
 }
 
 export class ConfigError extends Error {}
 
 const argsSchema = z
-  .union([z.string(), z.array(z.string()), z.undefined()])
+  .union([z.string(), z.array(z.string())])
+  .optional()
   .transform((value) => {
     if (!value) {
       return undefined;
@@ -44,15 +48,34 @@ export const connectionOverridesSchema = z
     args: argsSchema,
     cwd: z.string().trim().min(1).optional(),
     autoClose: z.coerce.boolean().optional(),
+    autoLaunch: z.coerce.boolean().optional(),
+    launchTimeout: z.coerce.number().int().positive().optional(),
+    connectTimeout: z.coerce.number().int().positive().optional(),
   })
   .strict();
 
 export type ConnectionOverrides = z.infer<typeof connectionOverridesSchema>;
 
+function mergeDefined<T extends Record<string, unknown>>(
+  ...sources: T[]
+): T {
+  const result = {} as T;
+
+  for (const source of sources) {
+    for (const [key, value] of Object.entries(source)) {
+      if (value !== undefined) {
+        result[key as keyof T] = value as T[keyof T];
+      }
+    }
+  }
+
+  return result;
+}
+
 function fromPrevious(
   previous?: WeappConnectionConfig
 ): ConnectionOverrides {
-  const base: ConnectionOverrides = {};
+  const base: ConnectionOverrides = { args: undefined };
   if (!previous) {
     return base;
   }
@@ -70,6 +93,12 @@ function fromPrevious(
   if (previous.cwd) base.cwd = previous.cwd;
   if (typeof previous.autoClose === "boolean")
     base.autoClose = previous.autoClose;
+  if (typeof previous.autoLaunch === "boolean")
+    base.autoLaunch = previous.autoLaunch;
+  if (typeof previous.launchTimeout === "number")
+    base.launchTimeout = previous.launchTimeout;
+  if (typeof previous.connectTimeout === "number")
+    base.connectTimeout = previous.connectTimeout;
   return base;
 }
 
@@ -80,6 +109,7 @@ export function resolveConfig(
   const envInput: ConnectionOverrides = connectionOverridesSchema.parse({
     mode: process.env.WEAPP_AUTOMATOR_MODE,
     cliPath: process.env.WECHAT_DEVTOOLS_CLI_PATH,
+    projectPath: process.env.WEAPP_PROJECT_PATH,
     wsEndpoint: process.env.WEAPP_WS_ENDPOINT,
     timeout: process.env.WEAPP_DEVTOOLS_TIMEOUT,
     port: process.env.WEAPP_DEVTOOLS_PORT,
@@ -89,19 +119,18 @@ export function resolveConfig(
     args: process.env.WEAPP_DEVTOOLS_ARGS,
     cwd: process.env.WEAPP_DEVTOOLS_CWD,
     autoClose: process.env.WEAPP_AUTOCLOSE,
+    autoLaunch: process.env.WEAPP_AUTOLAUNCH,
+    launchTimeout: process.env.WEAPP_LAUNCH_TIMEOUT,
+    connectTimeout: process.env.WEAPP_CONNECT_TIMEOUT,
   });
 
   const base = fromPrevious(previous);
 
-  const overrideConfig = overrides
+  const overrideConfig: ConnectionOverrides = overrides
     ? connectionOverridesSchema.parse(overrides)
-    : {};
+    : { args: undefined };
 
-  const merged: ConnectionOverrides = {
-    ...base,
-    ...envInput,
-    ...overrideConfig,
-  };
+  const merged = mergeDefined(base, envInput, overrideConfig);
 
   const mode: AutomatorMode =
     merged.mode ??
@@ -120,6 +149,9 @@ export function resolveConfig(
     args: merged.args,
     cwd: merged.cwd,
     autoClose: merged.autoClose,
+    autoLaunch: merged.autoLaunch,
+    launchTimeout: merged.launchTimeout,
+    connectTimeout: merged.connectTimeout,
   };
 
   if (config.mode === "connect") {
