@@ -1,0 +1,38 @@
+#!/usr/bin/env node
+
+import { FastMCP } from "fastmcp";
+
+import { createTools } from "./tools.js";
+import { WeappAutomatorManager } from "./weappClient.js";
+import { globalTimeoutMs } from "./config.js";
+
+const manager = new WeappAutomatorManager();
+
+const server = new FastMCP({
+    name: "weapp-dev-mcp",
+    version: "0.1.0",
+    instructions:
+        "Controls WeChat Mini Program projects through WeChat DevTools using miniprogram-automator.",
+});
+
+const tools = createTools(manager).map(tool => ({
+    ...tool,
+    timeoutMs: tool.timeoutMs ?? globalTimeoutMs
+}));
+server.addTools(tools);
+
+server.on("disconnect", async () => {
+    await manager.close();
+});
+
+// await server.start({
+//   transportType: "stdio",
+// });
+//
+await server.start({
+    transportType: "httpStream",
+    httpStream: {
+        port: 3000,
+        stateless: true,
+    }
+})
