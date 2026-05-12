@@ -546,18 +546,23 @@ export class WeappAutomatorManager {
 
   private async isPortInUse(port: number): Promise<boolean> {
     return new Promise((resolve) => {
-      const server = new net.Server();
-      
-      server.once("error", () => {
-        resolve(true);
-      });
-      
-      server.once("listening", () => {
-        server.close();
-        resolve(false);
-      });
-      
-      server.listen(port, "127.0.0.1");
+      const socket = net.createConnection({ host: "127.0.0.1", port });
+      let resolved = false;
+
+      const finish = (connected: boolean) => {
+        if (resolved) {
+          return;
+        }
+        resolved = true;
+        socket.removeAllListeners();
+        socket.destroy();
+        resolve(connected);
+      };
+
+      socket.setTimeout(1000);
+      socket.once("connect", () => finish(true));
+      socket.once("timeout", () => finish(false));
+      socket.once("error", () => finish(false));
     });
   }
 
